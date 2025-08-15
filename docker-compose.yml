@@ -1,34 +1,48 @@
-mongodb:
-  image: mongo:6.0
-  ports:
-    - "27017:27017"
-  environment:
-    - MONGO_INITDB_ROOT_USERNAME=nexuschat
-    - MONGO_INITDB_ROOT_PASSWORD=nexuschat_password
-    - MONGO_INITDB_DATABASE=nexuschat
-  volumes:
-    - ./data/mongodb:/data/db
+version: '3.8'
 
-nexuschat:
-  build: .
-  ports:
-    - "8765:8765"
-  environment:
-    - NODE_ENV=production
-    - PORT=8765
-    - CLIENT_URL=http://localhost:3000
-    - MONGODB_URI=mongodb://nexuschat:nexuschat_password@mongodb:27017/nexuschat?authSource=admin
-    - VITROCAD_BASE_URL=https://your-vitrocad-server.com
-    - VITROCAD_API_PATH=/api
-    - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-    - JWT_EXPIRE=7d
-    - MAX_FILE_SIZE=10485760
-    - UPLOAD_PATH=./uploads
-    - MAX_CHAT_MEMBERS=100
-    - MAX_MESSAGE_LENGTH=4000
-    - ENABLE_NOTIFICATIONS=true
-    - NOTIFICATION_SOUND=true
-  volumes:
-    - ./data/uploads:/app/uploads
-  links:
-    - mongodb
+services:
+  mongodb:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=nexuschat
+      - MONGO_INITDB_ROOT_PASSWORD=nexuschat_password
+      - MONGO_INITDB_DATABASE=nexuschat
+    volumes:
+      - ./data/mongodb:/data/db
+    networks:
+      - nexuschat-network
+
+  nexuschat:
+    build: .
+    ports:
+      - "8765:8765"
+    environment:
+      - NODE_ENV=production
+      - PORT=8765
+      - CLIENT_URL=http://localhost:3000
+      - MONGODB_URI=mongodb://nexuschat:nexuschat_password@mongodb:27017/nexuschat?authSource=admin
+      - VITROCAD_BASE_URL=https://your-vitrocad-server.com
+      - VITROCAD_API_PATH=/api
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_EXPIRE=7d
+      - MAX_FILE_SIZE=10485760
+      - UPLOAD_PATH=./uploads
+      - MAX_CHAT_MEMBERS=100
+      - MAX_MESSAGE_LENGTH=4000
+      - ENABLE_NOTIFICATIONS=true
+      - NOTIFICATION_SOUND=true
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - nexuschat-network
+
+networks:
+  nexuschat-network:
+    driver: bridge
+
+volumes:
+  uploads_data:
