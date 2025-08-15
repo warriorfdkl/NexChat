@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # MongoDB база данных
+  mongodb:
+    image: mongo:6.0
+    container_name: nexuschat-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: nexuschat
+      MONGO_INITDB_ROOT_PASSWORD: nexuschat_password
+      MONGO_INITDB_DATABASE: nexuschat
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - nexuschat-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/nexuschat --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nexus Chat приложение
+  nexuschat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexuschat-app
+    restart: unless-stopped
+    environment:
+      # Настройки сервера
+      NODE_ENV: production
+      PORT: 8765
+      CLIENT_URL: http://localhost:3000
+      
+      # База данных
+      MONGODB_URI: mongodb://nexuschat:nexuschat_password@mongodb:27017/nexuschat?authSource=admin
+      
+      # VitroCAD API (настройте под ваш сервер)
+      VITROCAD_BASE_URL: https://your-vitrocad-server.com
+      VITROCAD_API_PATH: /api
+      
+      # JWT секретный ключ (измените в продакшене!)
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      JWT_EXPIRE: 7d
+      
+      # Настройки файлов
+      MAX_FILE_SIZE: 10485760
+      UPLOAD_PATH: ./uploads
+      
+      # Настройки чатов
+      MAX_CHAT_MEMBERS: 100
+      MAX_MESSAGE_LENGTH: 4000
+      
+      # Настройки уведомлений
+      ENABLE_NOTIFICATIONS: true
+      NOTIFICATION_SOUND: true
+    ports:
+      - "8765:8765"
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - nexuschat-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx для проксирования (опционально)
+  nginx:
+    image: nginx:alpine
+    container_name: nexuschat-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - nexuschat-network
+    depends_on:
+      - nexuschat
+    profiles:
+      - production
+
+volumes:
+  mongodb_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  nexuschat-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
